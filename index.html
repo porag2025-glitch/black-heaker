@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BLACKSCREEN:// GREEN_TERMINAL — Simulation Only</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --g0:#000000;
+    --g1:#003300;
+    --g2:#00aa2a;
+    --g3:#00ff41;
+    --g4:#7dff9e;
+    --g5:#ccffd9;
+  }
+  *{ -webkit-tap-highlight-color: transparent; }
+  html,body{ background:#000; height:100%; }
+  body{
+    font-family:'Share Tech Mono', monospace;
+    background:#000;
+    color:var(--g3);
+    overflow-x:hidden;
+  }
+  .font-crt{ font-family:'VT323', monospace; }
+  .phosphor{
+    text-shadow: 0 0 6px rgba(0,255,65,.9), 0 0 18px rgba(0,255,65,.45), 0 0 42px rgba(0,255,65,.25);
+  }
+  .phosphor-dim{ text-shadow: 0 0 8px rgba(0,255,65,.35); }
+  .phosphor-soft{ text-shadow: 0 0 4px rgba(0,255,65,.6); }
+
+  /* scanlines + crt */
+  .scanlines{
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,0) 0px,
+      rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.28) 3px,
+      rgba(0,0,0,0.28) 4px
+    );
+    mix-blend-mode: multiply;
+  }
+  .scan-move{
+    background: linear-gradient(to bottom, transparent 0%, rgba(0,255,65,.07) 50%, transparent 100%);
+    height:140px;
+    animation: scanMove 6s linear infinite;
+  }
+  @keyframes scanMove{
+    0%{ transform: translateY(-160px); }
+    100%{ transform: translateY(110vh); }
+  }
+  .vignette{
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 82%, rgba(0,0,0,.95) 100%);
+  }
+  .crt-flicker{ animation: flicker 4s infinite; }
+  @keyframes flicker{
+    0%,100%{ opacity:1; }
+    3%{ opacity:.97; }
+    6%{ opacity:1; }
+    42%{ opacity:1; }
+    43%{ opacity:.92; }
+    44%{ opacity:1; }
+    71%{ opacity:1; }
+    72%{ opacity:.96; }
+    73%{ opacity:1; }
+  }
+  .blink{ animation: blink 1.05s steps(1) infinite; }
+  @keyframes blink{ 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  .terminal-scroll::-webkit-scrollbar{ width:8px; height:8px; }
+  .terminal-scroll::-webkit-scrollbar-track{ background:#000; border-left:1px solid rgba(0,255,65,.2); }
+  .terminal-scroll::-webkit-scrollbar-thumb{ background:rgba(0,255,65,.35); border:1px solid rgba(0,255,65,.6); }
+  .terminal-scroll::-webkit-scrollbar-thumb:hover{ background:rgba(0,255,65,.6); }
+  .terminal-scroll{ scrollbar-width:thin; scrollbar-color: rgba(0,255,65,.4) #000; }
+
+  .box-glow{
+    box-shadow: 0 0 0 1px rgba(0,255,65,.25), 0 0 18px rgba(0,255,65,.12), inset 0 0 24px rgba(0,255,65,.06);
+  }
+  .box-glow-strong{
+    box-shadow: 0 0 0 1px rgba(0,255,65,.5), 0 0 28px rgba(0,255,65,.22), inset 0 0 32px rgba(0,255,65,.08);
+  }
+  .btn-term{
+    transition: all .18s ease;
+  }
+  .btn-term:hover{
+    background: rgba(0,255,65,.14);
+    box-shadow: 0 0 18px rgba(0,255,65,.35), inset 0 0 12px rgba(0,255,65,.12);
+    transform: translateY(-1px);
+  }
+  .btn-term:active{ transform: translateY(0px) scale(.98); }
+
+  .glitch{ position:relative; }
+  .glitch::before, .glitch::after{
+    content: attr(data-text);
+    position:absolute; left:0; top:0; width:100%;
+    opacity:.7; pointer-events:none;
+  }
+  .glitch::before{ transform: translate(-2px,-1px); clip-path: inset(10% 0 70% 0); animation: gl1 2.8s infinite steps(2); color:#00ff41; }
+  .glitch::after{ transform: translate(2px,1px); clip-path: inset(60% 0 10% 0); animation: gl2 3.4s infinite steps(2); color:#00ff41; }
+  @keyframes gl1{ 0%,92%,100%{opacity:0} 93%{opacity:.8} 94%{opacity:0} 96%{opacity:.7} 97%{opacity:0} }
+  @keyframes gl2{ 0%,90%,100%{opacity:0} 91%{opacity:.6} 92%{opacity:0} 95%{opacity:.8} 96%{opacity:0} }
+
+  .crt-turn-on{ animation: turnOn .7s ease-out forwards; }
+  @keyframes turnOn{
+    0%{ transform: scaleY(.005) scaleX(.6); filter: brightness(8); opacity:0; }
+    40%{ transform: scaleY(.02) scaleX(1); filter: brightness(6); opacity:1; }
+    70%{ transform: scaleY(1.02) scaleX(1); filter: brightness(2); }
+    100%{ transform: scaleY(1) scaleX(1); filter: brightness(1); opacity:1; }
+  }
+
+  input#cmdInput{
+    background:transparent; outline:none; border:none; caret-color:#00ff41;
+    color:#00ff41; width:100%;
+  }
+  input#cmdInput::selection{ background:rgba(0,255,65,.3); }
+
+  .noise{
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  }
+
+  .marquee-line{ white-space:nowrap; }
+  .bar-fill{ transition: width .3s ease; }
+
+  @media (max-width:1024px){
+    .scanlines{ opacity:.8; }
+  }
+</style>
+</head>
+<body class="bg-black text-[#00ff41] min-h-screen crt-flicker selection:bg-[#00ff41] selection:text-black">
+
+<!-- MATRIX RAIN BACKGROUND -->
+<canvas id="matrix" class="fixed inset-0 w-full h-full opacity-[0.22] pointer-events-none z-0"></canvas>
+
+<!-- CRT OVERLAYS -->
+<div class="fixed inset-0 z-[40] pointer-events-none scanlines opacity-90"></div>
+<div class="fixed inset-0 z-[41] pointer-events-none overflow-hidden">
+  <div class="scan-move w-full"></div>
+</div>
+<div class="fixed inset-0 z-[42] pointer-events-none vignette"></div>
+<div class="fixed inset-0 z-[43] pointer-events-none noise opacity-60"></div>
+
+<!-- BOOT / ENTRY OVERLAY -->
+<div id="bootOverlay" class="fixed inset-0 z-[100] bg-black flex items-center justify-center p-6">
+  <div class="w-full max-w-2xl">
+    <div class="border border-[#00ff41]/40 box-glow-strong bg-black/90 p-8 md:p-12 relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-[2px] bg-[#00ff41] shadow-[0_0_12px_#00ff41]"></div>
+      <div class="absolute bottom-0 left-0 w-full h-[2px] bg-[#00ff41]/60"></div>
+
+      <div class="flex items-center justify-between text-[11px] tracking-[0.25em] text-[#00ff41]/70 mb-6">
+        <span>SECURE SHELL // v4.2.0</span>
+        <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#00ff41] animate-pulse shadow-[0_0_8px_#00ff41]"></span> OFFLINE NODE</span>
+      </div>
+
+      <div class="text-center">
+        <div class="font-crt text-[13px] tracking-[0.4em] text-[#00ff41]/60 mb-3">/// INCOMING TRANSMISSION ///</div>
+        <h1 data-text="BLACKSCREEN" class="glitch phosphor font-crt font-bold leading-none text-[64px] md:text-[110px] tracking-tight">BLACKSCREEN</h1>
+        <div class="font-crt text-[22px] md:text-[32px] tracking-[0.35em] phosphor mt-1 text-[#00ff41]">GREEN_TERMINAL</div>
+
+        <pre class="hidden md:block text-[11px] leading-[1.1] text-[#00ff41]/70 phosphor-dim mt-6 text-left overflow-x-auto mx-auto w-fit">  ____  _        _    ____ _  __ ____   ____ ____  _____ _____ _   _
+ | __ )| |      / \  / ___| |/ /|  _ \ / ___|  _ \| ____| ____| \ | |
+ |  _ \| |     / _ \| |   | ' / | |_) | |   | |_) |  _| |  _| |  \| |
+ | |_) | |___ / ___ \ |___| . \ |  __/| |___|  _ <| |___| |___| |\  |
+ |____/|_____/_/   \_\____|_|\_\|_|    \____|_| \_\_____|_____|_| \_|</pre>
+
+        <p class="mt-6 text-[13px] md:text-sm text-[#00ff41]/80 leading-relaxed max-w-md mx-auto">
+          Black screen. Green text. Looks like a hacker screen.<br>
+          <span class="text-[#00ff41] phosphor-soft font-bold">It is NOT a hacker screen.</span> 100% fake movie-style simulation. 100% front-end HTML. No real hacking. No network. Just vibes.
+        </p>
+
+        <button id="enterBtn" class="btn-term mt-8 inline-flex items-center gap-3 border border-[#00ff41] px-8 py-4 font-crt text-xl tracking-[0.2em] bg-[#00ff41]/5 phosphor cursor-pointer">
+          <i data-lucide="power" class="w-5 h-5"></i>
+          [ INITIALIZE TERMINAL ]
+        </button>
+        <div class="mt-4 text-[11px] tracking-[0.2em] text-[#00ff41]/50">CLICK TO POWER ON CRT <span class="blink">_</span></div>
+
+        <div class="mt-8 grid grid-cols-3 gap-2 text-[10px] tracking-[0.15em] text-[#00ff41]/60">
+          <div class="border border-[#00ff41]/25 py-2">100% HTML/CSS/JS</div>
+          <div class="border border-[#00ff41]/25 py-2">0% REAL HACK</div>
+          <div class="border border-[#00ff41]/25 py-2">SAFE SIMULATION</div>
+        </div>
+      </div>
+    </div>
+    <div class="text-center mt-4 text-[11px] tracking-[0.2em] text-[#00ff41]/40">TIP: SOUND + TYPING RECOMMENDED — BEST ON DESKTOP</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="relative z-10 min-h-screen flex flex-col opacity-0 pointer-events-none">
+
+  <!-- TOP BAR -->
+  <header class="border-b border-[#00ff41]/30 bg-black/85 backdrop-blur-sm sticky top-0 z-30">
+    <div class="max-w-[1400px] mx-auto px-3 md:px-6 py-2.5 flex flex-wrap items-center gap-3 justify-between">
+      <div class="flex items-center gap-3">
+        <div class="flex gap-1.5">
+          <span class="w-3 h-3 rounded-full border border-[#00ff41] bg-[#00ff41]/20"></span>
+          <span class="w-3 h-3 rounded-full border border-[#00ff41] bg-[#00ff41]/20"></span>
+          <span class="w-3 h-3 rounded-full bg-[#00ff41] shadow-[0_0_10px_#00ff41]"></span>
+        </div>
+        <div class="font-crt text-lg leading-none tracking-wider phosphor">root@blackscreen:~<span class="blink">_</span></div>
+        <div class="hidden md:inline-flex items-center gap-1 text-[10px] tracking-[0.2em] border border-[#00ff41]/30 px-2 py-1 text-[#00ff41]/80">
+          <i data-lucide="shield-check" class="w-3 h-3"></i> SIMULATION ONLY
+        </div>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] md:text-xs tracking-[0.15em]">
+        <span class="hidden sm:flex items-center gap-1.5 text-[#00ff41]/80"><i data-lucide="wifi" class="w-3.5 h-3.5"></i><span id="netStat">UPLINK 94.2 MB/S</span></span>
+        <span class="hidden md:flex items-center gap-1.5 text-[#00ff41]/80"><i data-lucide="globe" class="w-3.5 h-3.5"></i><span id="fakeIp">185.22.14.09</span></span>
+        <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5"></i><span id="clock" class="phosphor">00:00:00</span></span>
+        <span class="flex items-center gap-1.5"><i data-lucide="timer" class="w-3.5 h-3.5"></i>UP <span id="uptime">00:00</span></span>
+        <button id="soundBtn" class="btn-term border border-[#00ff41]/40 px-2 py-1 flex items-center gap-1 cursor-pointer"><i data-lucide="volume-x" class="w-3.5 h-3.5"></i><span id="soundLabel">SND OFF</span></button>
+        <button id="matrixBtn" class="btn-term border border-[#00ff41]/40 px-2 py-1 hidden sm:flex items-center gap-1 cursor-pointer"><i data-lucide="binary" class="w-3.5 h-3.5"></i>MATRIX</button>
+      </div>
+    </div>
+    <!-- ticker -->
+    <div class="border-t border-[#00ff41]/20 bg-[#00ff41]/[0.04] overflow-hidden py-1">
+      <div id="ticker" class="marquee-line text-[11px] tracking-[0.15em] text-[#00ff41]/70 phosphor-dim whitespace-nowrap will-change-transform">*** SECURE CHANNEL ESTABLISHED *** ALL ACTIVITY IS SIMULATED *** 100% HTML + CSS + JS *** NO REAL NETWORK CALLS *** TYPE 'help' TO BEGIN ***</div>
+    </div>
+  </header>
+
+  <!-- MAIN GRID -->
+  <main class="flex-1 w-full max-w-[1400px] mx-auto px-3 md:px-6 py-4 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+
+    <!-- TERMINAL -->
+    <section class="border border-[#00ff41]/40 box-glow bg-black/90 flex flex-col min-h-[68vh] lg:min-h-[76vh] relative overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2 border-b border-[#00ff41]/25 bg-[#00ff41]/[0.06]">
+        <div class="flex items-center gap-2 text-[11px] tracking-[0.25em]">
+          <i data-lucide="terminal" class="w-4 h-4"></i> MAINFRAME.CONSOLE — TTY0
+        </div>
+        <div class="flex items-center gap-3 text-[11px] tracking-[0.15em] text-[#00ff41]/70">
+          <span class="hidden sm:inline">ENC: AES-4096 [FAKE]</span>
+          <span class="flex items-center gap-1"><span id="liveDot" class="w-2 h-2 bg-[#00ff41] rounded-full shadow-[0_0_8px_#00ff41] animate-pulse"></span> LIVE</span>
+        </div>
+      </div>
+
+      <div id="terminal" class="terminal-scroll flex-1 overflow-y-auto px-4 py-4 text-[13px] md:text-[14px] leading-[1.55] min-h-[380px] max-h-[62vh] lg:max-h-[62vh] cursor-text">
+        <div id="output" class="space-y-[2px]"></div>
+        <!-- input line -->
+        <div class="flex items-start gap-2 mt-2">
+          <span class="phosphor font-bold shrink-0">root@blackscreen:~$</span>
+          <div class="flex-1 relative">
+            <input id="cmdInput" autocomplete="off" autocapitalize="off" spellcheck="false" class="phosphor" placeholder="type 'help' and press ENTER..." />
+          </div>
+        </div>
+        <div id="bottomAnchor"></div>
+      </div>
+
+      <!-- quick commands -->
+      <div class="border-t border-[#00ff41]/25 bg-black p-3">
+        <div class="text-[10px] tracking-[0.3em] text-[#00ff41]/60 mb-2 flex items-center gap-2"><i data-lucide="zap" class="w-3 h-3"></i> QUICK EXECUTE — CLICK TO RUN</div>
+        <div class="flex flex-wrap gap-2">
+          <button data-cmd="breach" class="btn-term border border-[#00ff41]/50 bg-[#00ff41]/10 px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer"><i data-lucide="skull" class="w-3.5 h-3.5"></i>BREACH</button>
+          <button data-cmd="scan" class="btn-term border border-[#00ff41]/50 bg-[#00ff41]/10 px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer"><i data-lucide="radar" class="w-3.5 h-3.5"></i>SCAN</button>
+          <button data-cmd="decrypt" class="btn-term border border-[#00ff41]/50 bg-[#00ff41]/10 px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer"><i data-lucide="key-round" class="w-3.5 h-3.5"></i>DECRYPT</button>
+          <button data-cmd="trace" class="btn-term border border-[#00ff41]/50 bg-[#00ff41]/10 px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer"><i data-lucide="route" class="w-3.5 h-3.5"></i>TRACE</button>
+          <button data-cmd="firewall" class="btn-term border border-[#00ff41]/50 bg-[#00ff41]/10 px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer"><i data-lucide="shield" class="w-3.5 h-3.5"></i>FIREWALL</button>
+          <button data-cmd="overload" class="btn-term border border-[#00ff41] bg-[#00ff41] text-black font-bold px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer shadow-[0_0_18px_#00ff41]"><i data-lucide="siren" class="w-3.5 h-3.5"></i>OVERLOAD</button>
+          <button data-cmd="clear" class="btn-term border border-[#00ff41]/30 px-3 py-2 text-[12px] tracking-widest flex items-center gap-1.5 cursor-pointer ml-auto"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>CLEAR</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SIDE PANEL -->
+    <aside class="flex flex-col gap-4">
+      <!-- system core -->
+      <div class="border border-[#00ff41]/40 box-glow bg-black/90 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-crt text-lg tracking-[0.2em] flex items-center gap-2 phosphor"><i data-lucide="cpu" class="w-4 h-4"></i> SYSTEM.CORE</h2>
+          <span class="text-[10px] tracking-[0.2em] text-[#00ff41]/60">FAKE LOAD</span>
+        </div>
+        <div class="space-y-3 text-[12px]">
+          <div>
+            <div class="flex justify-between tracking-widest mb-1"><span>CPU</span><span id="cpuVal">42%</span></div>
+            <div class="h-2 border border-[#00ff41]/40 bg-[#00ff41]/5"><div id="cpuBar" class="h-full bg-[#00ff41] shadow-[0_0_10px_#00ff41] bar-fill" style="width:42%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between tracking-widest mb-1"><span>MEM</span><span id="memVal">68%</span></div>
+            <div class="h-2 border border-[#00ff41]/40 bg-[#00ff41]/5"><div id="memBar" class="h-full bg-[#00ff41]/80 shadow-[0_0_10px_#00ff41] bar-fill" style="width:68%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between tracking-widest mb-1"><span>NET</span><span id="netVal">91%</span></div>
+            <div class="h-2 border border-[#00ff41]/40 bg-[#00ff41]/5"><div id="netBar" class="h-full bg-[#00ff41]/70 shadow-[0_0_10px_#00ff41] bar-fill" style="width:91%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between tracking-widest mb-1"><span>STEALTH</span><span id="stealthVal">97%</span></div>
+            <div class="h-2 border border-[#00ff41]/40 bg-[#00ff41]/5"><div id="stealthBar" class="h-full bg-[#00ff41] shadow-[0_0_10px_#00ff41] bar-fill" style="width:97%"></div></div>
+          </div>
+        </div>
+        <canvas id="wave" class="w-full h-[72px] mt-4 border border-[#00ff41]/30 bg-black"></canvas>
+        <div class="grid grid-cols-3 gap-2 mt-3 text-center text-[10px] tracking-[0.15em]">
+          <div class="border border-[#00ff41]/25 py-2"><div class="font-crt text-lg phosphor" id="procCount">142</div>PROCS</div>
+          <div class="border border-[#00ff41]/25 py-2"><div class="font-crt text-lg phosphor" id="threadCount">890</div>THREADS</div>
+          <div class="border border-[#00ff41]/25 py-2"><div class="font-crt text-lg phosphor" id="tempVal">36°C</div>CORE.T</div>
+        </div>
+      </div>
+
+      <!-- network nodes -->
+      <div class="border border-[#00ff41]/40 box-glow bg-black/90 p-4">
+        <h2 class="font-crt text-lg tracking-[0.2em] flex items-center gap-2 phosphor mb-3"><i data-lucide="network" class="w-4 h-4"></i> ACTIVE.NODES</h2>
+        <div id="nodes" class="space-y-2 text-[12px]"></div>
+        <div class="mt-3 pt-3 border-t border-[#00ff41]/20 text-[11px] flex items-center justify-between tracking-widest text-[#00ff41]/70">
+          <span class="flex items-center gap-1"><i data-lucide="lock" class="w-3 h-3"></i> END-TO-END [PRETEND]</span>
+          <span id="nodeCount">7 NODES</span>
+        </div>
+      </div>
+
+      <!-- security -->
+      <div class="border border-[#00ff41]/40 box-glow bg-black/90 p-4">
+        <h2 class="font-crt text-lg tracking-[0.2em] flex items-center gap-2 phosphor mb-3"><i data-lucide="shield-half" class="w-4 h-4"></i> DEFENSE.GRID</h2>
+        <div class="space-y-2 text-[12px] tracking-widest">
+          <div class="flex justify-between border border-[#00ff41]/20 px-2 py-1.5"><span>FIREWALL</span><span id="fwState" class="font-bold phosphor">[ ACTIVE ]</span></div>
+          <div class="flex justify-between border border-[#00ff41]/20 px-2 py-1.5"><span>ENCRYPTION</span><span class="font-bold">[ AES-4096* ]</span></div>
+          <div class="flex justify-between border border-[#00ff41]/20 px-2 py-1.5"><span>TRACE SHIELD</span><span id="traceState" class="font-bold">[ CLOAKED ]</span></div>
+          <div class="flex justify-between border border-[#00ff41]/20 px-2 py-1.5"><span>* = imaginary</span><span class="text-[#00ff41]/60">100% SAFE</span></div>
+        </div>
+        <button id="firewallBtn" class="btn-term w-full mt-3 border border-[#00ff41] py-2.5 font-crt tracking-[0.2em] text-lg bg-[#00ff41]/10 cursor-pointer flex items-center justify-center gap-2"><i data-lucide="shield-off" class="w-4 h-4"></i> TOGGLE FIREWALL</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-[#00ff41]/30 bg-black/90">
+    <div class="max-w-[1400px] mx-auto px-3 md:px-6 py-3 flex flex-col md:flex-row gap-2 items-center justify-between text-[11px] tracking-[0.15em] text-[#00ff41]/70">
+      <div class="flex items-center gap-2">
+        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+        <span>THIS IS A MOVIE-STYLE SIMULATION. NO REAL HACKING. BUILT WITH 100% HTML / CSS / JS — VIEW SOURCE TO VERIFY.</span>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <span class="border border-[#00ff41]/30 px-2 py-1">BLACKSCREEN v4.2</span>
+        <span class="border border-[#00ff41]/30 px-2 py-1 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-[#00ff41] rounded-full animate-pulse"></span> REC</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+lucide.createIcons();
+const $ = (id)=>document.getElementById(id);
+const output = $('output'), terminal = $('terminal'), cmdInput = $('cmdInput');
+let booted=false, soundOn=false, matrixOn=true, firewallOn=true, busy=false;
+let cmdHistory=[], histIdx=-1;
+let audioCtx=null;
+
+/* ---------- SOUND (tiny beeps, all fake) ---------- */
+function beep(freq=880, dur=0.04, vol=0.04){
+  if(!soundOn) return;
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type='square'; o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function typeTick(){ beep(1200+Math.random()*600, 0.02, 0.02); }
+
+/* ---------- HELPERS ---------- */
+const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+const rand = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+function randomIP(){ return `${rand(11,255)}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`; }
+function randomHex(len=8){ let s=''; const c='0123456789ABCDEF'; for(let i=0;i<len;i++) s+=c[Math.floor(Math.random()*16)]; return s; }
+function randomHexBlock(n=4){ let a=[]; for(let i=0;i<n;i++) a.push(randomHex(2)); return a.join(' '); }
+function progressBar(pct, len=22){
+  const filled = Math.round((pct/100)*len);
+  return '[' + '█'.repeat(filled) + '░'.repeat(len-filled) + '] ' + String(pct).padStart(3,' ') + '%';
+}
+function scrollBottom(){ terminal.scrollTop = terminal.scrollHeight; }
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function addLine(html, cls=''){
+  const div = document.createElement('div');
+  div.className = cls;
+  div.innerHTML = html;
+  output.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+async function print(text='', opts={}){
+  const { speed=8, prefix='', glow=true, tick=true } = opts;
+  const line = addLine('', glow?'phosphor-soft':'');
+  const full = prefix + text;
+  // fast typing
+  if(speed<=0){
+    line.textContent = full;
+    scrollBottom();
+    return line;
+  }
+  let cur='';
+  for(let i=0;i<full.length;i++){
+    cur+=full[i];
+    line.textContent = cur;
+    if(tick && i%3===0) typeTick();
+    if(i%4===0) scrollBottom();
+    await sleep(speed);
+  }
+  scrollBottom();
+  return line;
+}
+async function printLines(lines, gap=120){
+  for(const l of lines){
+    if(typeof l==='string') await print(l,{speed:6});
+    else await print(l.t, l);
+    await sleep(gap);
+  }
+}
+function printHTML(html){ return addLine(html,'phosphor-soft'); }
+
+/* ---------- MATRIX RAIN ---------- */
+const mCanvas = $('matrix'), mCtx = mCanvas.getContext('2d');
+let mCols, mDrops, mFont=14;
+function initMatrix(){
+  mCanvas.width = window.innerWidth; mCanvas.height = window.innerHeight;
+  mCols = Math.floor(mCanvas.width / mFont);
+  mDrops = Array(mCols).fill(0).map(()=>Math.random()*-50);
+}
+initMatrix();
+window.addEventListener('resize', initMatrix);
+const mChars = '01アイカキクケコサシスセソ0123456789ABCDEF$#@%&*+=<>'.split('');
+setInterval(()=>{
+  if(!matrixOn){ mCtx.clearRect(0,0,mCanvas.width,mCanvas.height); return; }
+  mCtx.fillStyle='rgba(0,0,0,0.08)';
+  mCtx.fillRect(0,0,mCanvas.width,mCanvas.height);
+  mCtx.fillStyle='#00ff41';
+  mCtx.font = mFont+'px monospace';
+  for(let i=0;i<mDrops.length;i++){
+    const ch = mChars[Math.floor(Math.random()*mChars.length)];
+    mCtx.fillText(ch, i*mFont, mDrops[i]*mFont);
+    if(mDrops[i]*mFont > mCanvas.height && Math.random()>0.975) mDrops[i]=0;
+    mDrops[i]++;
+  }
+}, 50);
+
+/* ---------- WAVEFORM ---------- */
+const wCanvas = $('wave'), wCtx = wCanvas.getContext('2d');
+let waveX=0;
+function sizeWave(){ wCanvas.width = wCanvas.clientWidth; wCanvas.height = 72; }
+setTimeout(sizeWave,300); window.addEventListener('resize', sizeWave);
+setInterval(()=>{
+  if(!wCanvas.width) return;
+  wCtx.fillStyle='rgba(0,0,0,0.25)'; wCtx.fillRect(0,0,wCanvas.width,wCanvas.height);
+  wCtx.strokeStyle='rgba(0,255,65,0.25)'; wCtx.lineWidth=1;
+  wCtx.beginPath(); wCtx.moveTo(0,36); wCtx.lineTo(wCanvas.width,36); wCtx.stroke();
+  wCtx.strokeStyle='#00ff41'; wCtx.lineWidth=1.6; wCtx.shadowColor='#00ff41'; wCtx.shadowBlur=8;
+  wCtx.beginPath();
+  const t = Date.now()/300;
+  for(let x=0;x<wCanvas.width;x+=2){
+    const y = 36 + Math.sin((x+waveX)/12 + t)*10*Math.sin(x/50+t) + (Math.random()-0.5)*6;
+    if(x===0) wCtx.moveTo(x,y); else wCtx.lineTo(x,y);
+  }
+  wCtx.stroke(); wCtx.shadowBlur=0;
+  waveX+=3;
+}, 60);
+
+/* ---------- CLOCK / UPTIME / TICKER / STATS ---------- */
+let startTime = Date.now();
+setInterval(()=>{
+  const d=new Date();
+  $('clock').textContent = d.toTimeString().slice(0,8);
+  const s=Math.floor((Date.now()-startTime)/1000);
+  $('uptime').textContent = String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+},1000);
+
+const ticker = $('ticker');
+let tickPos = window.innerWidth;
+setInterval(()=>{
+  tickPos-=2;
+  const w = ticker.scrollWidth;
+  if(tickPos < -w) tickPos = window.innerWidth;
+  ticker.style.transform = `translateX(${tickPos}px)`;
+},20);
+
+let cpu=42, mem=68, net=91;
+setInterval(()=>{
+  cpu = Math.max(8, Math.min(99, cpu + rand(-9,10)));
+  mem = Math.max(22, Math.min(97, mem + rand(-5,6)));
+  net = Math.max(12, Math.min(99, net + rand(-12,12)));
+  $('cpuVal').textContent=cpu+'%'; $('cpuBar').style.width=cpu+'%';
+  $('memVal').textContent=mem+'%'; $('memBar').style.width=mem+'%';
+  $('netVal').textContent=net+'%'; $('netBar').style.width=net+'%';
+  $('netStat').textContent = 'UPLINK '+(20+net/2).toFixed(1)+' MB/S';
+  $('procCount').textContent = 120+Math.floor(cpu/2)+rand(-3,3);
+  $('threadCount').textContent = 700+cpu*3+rand(-10,10);
+  $('tempVal').textContent = (32+Math.floor(cpu/12))+ '°C';
+},900);
+
+const nodeNames=['relay-alpha','relay-bravo','ghost-node','vault-07','proxy-prime','dark-fiber','mirror-x','phantom-9'];
+function renderNodes(){
+  const box=$('nodes'); box.innerHTML='';
+  const n = rand(5,8);
+  for(let i=0;i<n;i++){
+    const ip=randomIP(), ms=rand(4,220), nm=pick(nodeNames);
+    const row=document.createElement('div');
+    row.className='flex items-center justify-between border border-[#00ff41]/20 px-2 py-1.5 bg-[#00ff41]/[0.03]';
+    row.innerHTML=`<span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-[#00ff41] rounded-full shadow-[0_0_6px_#00ff41] animate-pulse"></span>${nm}</span><span class="text-[#00ff41]/70">${ip} · ${ms}ms</span>`;
+    box.appendChild(row);
+  }
+  $('nodeCount').textContent=n+' NODES';
+  $('fakeIp').textContent=randomIP();
+}
+renderNodes(); setInterval(renderNodes, 4500);
+
+/* ---------- BOOT SEQUENCE ---------- */
+$('enterBtn').addEventListener('click', async ()=>{
+  beep(440,0.1,0.06);
+  // need user gesture for audio
+  try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  const ov=$('bootOverlay');
+  ov.style.transition='opacity .5s'; ov.style.opacity='0';
+  setTimeout(()=>ov.style.display='none',500);
+  const app=$('app');
+  app.classList.remove('opacity-0','pointer-events-none');
+  app.classList.add('crt-turn-on');
+  startTime=Date.now();
+  await sleep(600);
+  await bootSequence();
+});
+
+async function bootSequence(){
+  if(booted) return; booted=true;
+  busy=true;
+  await print('BLACKSCREEN BIOS v4.2.0 — checking memory ... OK', {speed:4});
+  await print('CPU: QUANTUM-CORE @ 9.99 THz ... OK', {speed:4});
+  await print('MOUNTING /dev/imagination ... OK', {speed:4});
+  await print('LOADING green-on-black theme ... 100% [FAVORITE PART]', {speed:4});
+  await sleep(250);
+  printHTML('<div class="border border-[#00ff41]/40 my-2 p-3 font-crt text-[15px] md:text-[18px] leading-tight phosphor">*** WARNING: THIS IS NOT A HACKER SCREEN ***<br><span class="text-[13px] md:text-[15px]">IT ONLY <u>LOOKS</u> LIKE ONE. 100% HARMLESS HTML THEATRE.</span></div>');
+  await sleep(300);
+  const lines=[
+    '[*] establishing secure pretend-channel ...',
+    '[*] spoofing IP to '+randomIP()+' (totally made up)',
+    '[*] routing via 7 ghost nodes ...',
+    '[OK] uplink stable — 94.2 MB/S (imaginary)',
+    '[OK] trace shield: CLOAKED',
+    '[OK] firewall: ACTIVE',
+    '',
+  ];
+  await printLines(lines, 180);
+  await print('Type '+ "'help'" + ' to see commands. Try '+ "'breach'" + ', '+ "'scan'" + ', '+ "'decrypt'" +'.', {speed:5});
+  printHTML('<div class="text-[#00ff41]/60 text-[12px] tracking-widest mt-1">TIP: CLICK QUICK-EXECUTE BUTTONS BELOW OR TYPE. GREEN ONLY. BLACK ONLY. NO EXCEPTIONS.</div>');
+  busy=false;
+  cmdInput.focus();
+}
+
+/* ---------- COMMAND ENGINE ---------- */
+terminal.addEventListener('click', ()=>cmdInput.focus());
+cmdInput.addEventListener('keydown', async (e)=>{
+  if(e.key==='Enter'){
+    const raw = cmdInput.value.trim();
+    cmdInput.value='';
+    if(!raw){ echoPrompt(''); return; }
+    cmdHistory.unshift(raw); histIdx=-1;
+    echoPrompt(raw);
+    await runCommand(raw);
+    scrollBottom(); cmdInput.focus();
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(cmdHistory.length){ histIdx=Math.min(histIdx+1, cmdHistory.length-1); cmdInput.value=cmdHistory[histIdx]||''; }
+  } else if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(histIdx>0){ histIdx--; cmdInput.value=cmdHistory[histIdx]; } else { histIdx=-1; cmdInput.value=''; }
+  }
+});
+function echoPrompt(cmd){
+  addLine(`<span class="font-bold phosphor">root@blackscreen:~$</span> <span class="phosphor">${esc(cmd)}</span>`);
+}
+document.querySelectorAll('[data-cmd]').forEach(b=>{
+  b.addEventListener('click', async ()=>{
+    const c=b.getAttribute('data-cmd');
+    echoPrompt(c);
+    await runCommand(c);
+    cmdInput.focus();
+  });
+});
+$('firewallBtn').addEventListener('click', ()=>{ echoPrompt('firewall'); runCommand('firewall'); });
+$('soundBtn').addEventListener('click', ()=>{
+  soundOn=!soundOn;
+  $('soundLabel').textContent = soundOn?'SND ON':'SND OFF';
+  $('soundBtn').querySelector('svg, i')?.classList.toggle('text-black');
+  if(soundOn){ beep(880,0.08,0.06); setTimeout(()=>beep(1320,0.08,0.06),120); }
+});
+$('matrixBtn').addEventListener('click', ()=>{
+  matrixOn=!matrixOn;
+  printHTML(`<div>MATRIX RAIN: <b>${matrixOn?'[ ON ]':'[ OFF ]'}</b></div>`);
+});
+
+async function runCommand(raw){
+  const parts = raw.trim().split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const arg = parts.slice(1).join(' ');
+  beep(600,0.03,0.03);
+
+  switch(cmd){
+    case 'help': case '?': return cmdHelp();
+    case 'clear': case 'cls': output.innerHTML=''; return;
+    case 'breach': case 'hack': return seqBreach(arg||pick(['vault-07','mainframe','ghost-server','sat-link-9','data-bunker']));
+    case 'scan': return seqScan();
+    case 'decrypt': return seqDecrypt();
+    case 'trace': case 'traceroute': return seqTrace(arg||randomIP());
+    case 'firewall': return seqFirewall(arg);
+    case 'virus': return seqVirus();
+    case 'overload': return seqOverload();
+    case 'matrix': {
+      if(arg==='off') matrixOn=false; else if(arg==='on') matrixOn=true; else matrixOn=!matrixOn;
+      return print(`MATRIX RAIN toggled ${matrixOn?'[ ON ]':'[ OFF ]'}`,{speed:3});
+    }
+    case 'whoami': return print('guest (pretend-root). Real privileges: none. As it should be.',{speed:4});
+    case 'ls': case 'dir': return seqLS();
+    case 'open': return seqOpen(arg);
+    case 'sudo': return print("permission denied: nice try. This terminal respects boundaries.",{speed:4});
+    case 'hack-nasa': case 'nasa': return print("NASA called. They said: cool wallpaper, please stop pinging us. (Blocked for your safety — just kidding, nothing was sent.)",{speed:4});
+    case 'self-destruct': return seqSelfDestruct();
+    case 'about': case 'info': return cmdAbout();
+    case 'hello': case 'hi': case 'hey': return print('HELLO, OPERATOR. Green looks good on you. Type '+ "'help'"+' to play.',{speed:4});
+    case 'exit': case 'quit': case 'logout': return print("There is no escape. Only more green. (Just kidding — close the tab anytime.)",{speed:4});
+    case '': return;
+    default: {
+      await print(`command not found: '${esc(cmd)}' — did you mean 'help'?`,{speed:2});
+      await print(`HINT: try breach / scan / decrypt / trace / overload`,{speed:2});
+    }
+  }
+}
+
+async function cmdHelp(){
+  printHTML(`
+  <div class="border border-[#00ff41]/30 p-3 my-2 bg-[#00ff41]/[0.04]">
+    <div class="font-crt text-lg tracking-[0.2em] phosphor mb-2">AVAILABLE COMMANDS:</div>
+    <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
+      <div><b>help</b> ............ this menu</div>
+      <div><b>breach [target]</b> . fake breach sequence</div>
+      <div><b>scan</b> ............ fake network scan</div>
+      <div><b>decrypt</b> ......... fake file decrypt</div>
+      <div><b>trace [ip]</b> ...... fake trace route</div>
+      <div><b>firewall</b> ........ toggle pretend firewall</div>
+      <div><b>virus</b> ........... harmless ascii virus joke</div>
+      <div><b>overload</b> ........ full drama mode</div>
+      <div><b>ls</b> .............. list fake files</div>
+      <div><b>open [file]</b> ..... open fake file</div>
+      <div><b>matrix on/off</b> ... toggle rain</div>
+      <div><b>clear</b> ........... wipe screen</div>
+      <div><b>whoami / about</b> ... lore drop</div>
+      <div><b>self-destruct</b> ... do NOT worry</div>
+    </div>
+    <div class="mt-2 text-[11px] tracking-[0.15em] text-[#00ff41]/60">ALL COMMANDS ARE THEATRE. NOTHING LEAVES YOUR BROWSER.</div>
+  </div>`);
+}
+async function cmdAbout(){
+  await printLines([
+    'BLACKSCREEN:// GREEN_TERMINAL v4.2.0',
+    '100% HTML + CSS + JS. Single file. No backend. No sockets. No exploits.',
+    'Purpose: look like a hacker screen for videos / parties / fun.',
+    'Palette: BLACK (#000) + GREEN (#00FF41) only. Doctor approved.',
+  ],120);
+}
+
+/* ---------- SEQUENCES (all fake) ---------- */
+async function seqBreach(target){
+  if(busy){ await print('[!] console busy — queuing breach ...',{speed:2}); }
+  busy=true;
+  await print(`[*] targeting ${esc(target)} @ ${randomIP()} ...`,{speed:5});
+  const steps=[
+    'resolving host','spoofing handshake','bypassing pretend-firewall',
+    'injecting soap bubbles','escalating to pretend-root','dumping emoji database (empty)',
+    'covering tracks with digital leaves'
+  ];
+  const barLine = addLine('', 'phosphor');
+  for(let p=0;p<=100;p+=rand(4,11)){
+    const step = steps[Math.min(steps.length-1, Math.floor(p/15))];
+    barLine.textContent = `${progressBar(Math.min(100,p))} ${step}...`;
+    beep(300+p*5,0.02,0.015);
+    scrollBottom();
+    await sleep(rand(90,220));
+  }
+  barLine.textContent = progressBar(100)+' BREACH COMPLETE (in Hollywood terms)';
+  await sleep(250);
+  await print(`[OK] access granted to ${esc(target)} :: clearance = MOVIE-STAR`,{speed:4});
+  await print(`[OK] downloaded 0 bytes in 0.00s — because nothing is real here.`,{speed:4});
+  printHTML(`<pre class="text-[11px] md:text-[12px] leading-none phosphor border border-[#00ff41]/30 p-3 my-2 w-fit">  +-- ACCESS GRANTED --+\n  |  TARGET: ${esc(target).padEnd(12,' ').slice(0,12)} |\n  |  MODE: FAKE       |\n  |  RISK: ZERO       |\n  +-------------------+</pre>`);
+  busy=false;
+}
+
+async function seqScan(){
+  busy=true;
+  await print('[*] sweeping subnet 10.13.37.0/24 (imaginary) ...',{speed:5});
+  for(let i=0;i<7;i++){
+    const ip=`10.13.37.${rand(2,254)}`;
+    const port=pick([22,80,443,1337,8080,31337]);
+    await print(`[+] ${ip}:${port} OPEN :: ${pick(['ghost-relay','honeypot-(yummy)','printer-from-1997','vault-node','mirror-cache'])} :: ${rand(3,180)}ms`,{speed:2});
+    await sleep(rand(120,320));
+  }
+  await print('[OK] scan complete. 7 nodes found. 0 touched. We just looked, politely.',{speed:4});
+  busy=false;
+}
+
+async function seqDecrypt(){
+  busy=true;
+  await print('[*] locating encrypted files (fake) ...',{speed:5});
+  const files=['diary.txt.enc','totally-secret-plans.pdf.enc','grandmas-cookies.recipe.enc','mars-colony-blueprint.dat.enc'];
+  for(const f of files){
+    await print(`[-] ${f} :: LOCKED`,{speed:3});
+    await sleep(200);
+  }
+  const line = addLine('','phosphor');
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*';
+  let revealed='';
+  const secret='NOTHING-TO-HIDE-:)';
+  // decrypt animation revealing secret
+  for(let i=0;i<secret.length;i++){
+    for(let j=0;j<4;j++){
+      let scr=revealed;
+      for(let k=i;k<secret.length;k++) scr+=chars[Math.floor(Math.random()*chars.length)];
+      line.textContent=`DECRYPTING: [${scr}]`;
+      await sleep(40);
+    }
+    revealed+=secret[i];
+    line.textContent=`DECRYPTING: [${revealed}]`;
+    beep(500+i*40,0.03,0.02);
+  }
+  await sleep(300);
+  await print('[OK] DECRYPTED: "NOTHING-TO-HIDE-:)" — see? Harmless.',{speed:4});
+  await print('[*] files re-encrypted for dramatic effect.',{speed:4});
+  busy=false;
+}
+
+async function seqTrace(ip){
+  busy=true;
+  await print(`[*] tracing route to ${esc(ip)} (make-believe packets) ...`,{speed:5});
+  const hops=['local-ghost','router-living-room','isp-imagination','backbone-of-dreams','transatlantic-cable-(rubber-duck)','datacenter-atlantis','cloud-nine','destination'];
+  for(let i=0;i<hops.length;i++){
+    await print(` ${String(i+1).padStart(2,' ')}  ${randomIP()}  ${rand(2,180)}ms  ${rand(2,180)}ms  ${rand(2,180)}ms  ${hops[i]}`,{speed:2});
+    await sleep(rand(180,380));
+  }
+  await print('[OK] trace complete in 8 hops. No packets were harmed.',{speed:4});
+  busy=false;
+}
+
+async function seqFirewall(arg){
+  firewallOn = arg==='on' ? true : arg==='off' ? false : !firewallOn;
+  $('fwState').textContent = firewallOn?'[ ACTIVE ]':'[ DOWN ]';
+  $('traceState').textContent = firewallOn?'[ CLOAKED ]':'[ VISIBLE ]';
+  await print(`[*] firewall ${firewallOn?'RAISING':'LOWERING'} pretend-shields ...`,{speed:5});
+  const l=addLine('','phosphor');
+  for(let p=0;p<=100;p+=rand(8,18)){ l.textContent=progressBar(Math.min(100,p))+(firewallOn?' shielding...':' exposing (theatrically)...'); await sleep(120); }
+  await print(firewallOn?'[OK] you are now 1000% invisible (in this tab only).':'[!] shields down. Still 100% safe — nothing real to attack.',{speed:4});
+}
+
+async function seqVirus(){
+  busy=true;
+  await print('[!] deploying friendly virus: hug.exe ...',{speed:5});
+  printHTML(`<pre class="text-[12px] leading-none phosphor my-2">   .-\"-.\n  / .--. \\\n | (o)(o) |  &lt; hello, i am hug.exe\n  | .--. |   i do nothing but blink\n   \\ '--' /\n    '--' </pre>`);
+  for(let i=0;i<3;i++){ await print(`[*] hugging sector ${rand(0,999)} ... OK`,{speed:3}); await sleep(250); }
+  await print('[OK] system hugged. Morale +100. Threat level: adorable.',{speed:4});
+  busy=false;
+}
+
+async function seqLS(){
+  printHTML(`
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 my-2 text-[13px]">
+    <div>diary.txt.enc</div><div>passwords.txt <span class="text-[#00ff41]/50">(jk: recipes)</span></div><div>matrix-rain.js</div>
+    <div>definitely-not-virus/</div><div>mission-briefing.log</div><div>green-paint-bucket.iso</div>
+    <div>blackscreen-wallpaper.png</div><div>hug.exe</div><div>README-ITS-FAKE.md</div>
+  </div>`);
+  await print("hint: try 'open mission-briefing.log'",{speed:3});
+}
+async function seqOpen(arg){
+  if(!arg){ return print("usage: open [filename] — try 'ls' first.",{speed:3}); }
+  const a=arg.toLowerCase();
+  if(a.includes('mission')){
+    await printLines(['--- MISSION-BRIEFING.LOG ---','OBJECTIVE: look extremely hacker.','RULE 1: black background.','RULE 2: green text only.','RULE 3: no actual hacking. ever.','STATUS: you are nailing it.','--- END OF FILE ---'],120);
+  } else if(a.includes('readme')){
+    await print('README-ITS-FAKE.md: Yes. 100% HTML. You can right-click > View Source. All magic is in one file.',{speed:4});
+  } else if(a.includes('password')){
+    await print('passwords.txt: hunter2, correct-horse-battery-staple, green-is-the-best-color (all fake, please use a password manager IRL)',{speed:4});
+  } else if(a.includes('diary')){
+    await print('diary.txt.enc: [ENCRYPTED] spoiler: it just says "today I looked like a hacker and it ruled."',{speed:4});
+  } else {
+    // hex dump theatre
+    await print(`[*] opening ${esc(arg)} ...`,{speed:4});
+    for(let i=0;i<6;i++){
+      await print(`0x${randomHex(4)}: ${randomHexBlock(8)}  |${pick(['..GREEN..','.BLACK..','..FAKE...','..1337...'])}|`,{speed:1});
+      await sleep(120);
+    }
+    await print('[OK] file closed. Nothing executed. As promised.',{speed:3});
+  }
+}
+
+async function seqOverload(){
+  busy=true;
+  await print('[!!] OVERLOAD INITIATED — DRAMA LEVELS RISING',{speed:6});
+  printHTML('<div class="border border-[#00ff41] box-glow-strong p-3 my-2 font-crt text-xl tracking-[0.2em] text-center phosphor animate-pulse">!! SYSTEM OVERLOAD !!</div>');
+  for(let i=0;i<10;i++){
+    await print(`0x${randomHex(6)} :: ${pick(['INJECTING GREEN','OVERDRIVING PHOSPHOR','REROUTING IMAGINATION','AMPLIFYING VIBES','SPINNING FANS (audibly)'])} :: ${rand(90,999)} TB/S`,{speed:1});
+    beep(200+Math.random()*800,0.04,0.03);
+    await sleep(140);
+  }
+  const l=addLine('','phosphor font-bold');
+  for(let p=0;p<=100;p+=5){ l.textContent='CRITICAL: '+progressBar(p); await sleep(70); }
+  await sleep(400);
+  await print('[OK] overload contained. That was close (not really). Coolant: iced matcha (green, obviously).',{speed:5});
+  busy=false;
+}
+
+async function seqSelfDestruct(){
+  await print('[!] SELF-DESTRUCT in 5...',{speed:6});
+  for(let i=5;i>=1;i--){ await print(String(i)+'...',{speed:1}); beep(300+i*100,0.12,0.05); await sleep(450); }
+  await print('...just kidding. This button does confetti, but confetti is also green here:',{speed:4});
+  printHTML('<div class="phosphor text-center tracking-widest my-2">* * * * * * * * * * BOOM (green) * * * * * * * * * *</div>');
+  await print('[OK] system intact. You live to hack (pretend) another day.',{speed:4});
+}
+
+/* auto demo hex feed when idle? small ambient logs */
+setInterval(async ()=>{
+  if(!booted || busy || document.hidden) return;
+  if(Math.random()>0.85){
+    const msgs=[
+      `[bg] heartbeat ${randomHex(4)} :: latency ${rand(2,40)}ms :: all quiet`,
+      `[bg] ghost packet from ${randomIP()} ignored politely`,
+      `[bg] scrubbed ${rand(10,999)} fake logs`,
+      `[bg] phosphor levels nominal`,
+    ];
+    // ambient, dim
+    const d=addLine(`<span class="text-[#00ff41]/50">${pick(msgs)}</span>`);
+    // cap lines
+    while(output.children.length>220) output.removeChild(output.firstChild);
+    scrollBottom();
+  }
+}, 5000);
+
+// focus input on load attempt (after boot it matters)
+window.addEventListener('keydown', (e)=>{
+  if(booted && document.activeElement!==cmdInput && e.key.length===1) cmdInput.focus();
+});
+</script>
+</body>
+</html>
